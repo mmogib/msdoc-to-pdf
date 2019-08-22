@@ -1,6 +1,7 @@
 import { ipcRenderer as ipc } from 'electron'
 import Vue from 'vue'
 import Vuex from 'vuex'
+import axios from 'axios'
 
 Vue.use(Vuex)
 const defaultFolder = {
@@ -36,7 +37,16 @@ export default new Vuex.Store({
         ipc.send('get-last-folder')
         state.loading = false
       })
+      ipc.on('done-converting', () => {
+        state.loading = false
+      })
     },
+
+    START_CONVERTING: async ({ state }, payload) => {
+      state.loading = false
+      ipc.send('start-converting', payload)
+    },
+
     ADD_FOLDER: ({ state }, payload) => {
       state.loading = true
       ipc.send('new-folder', payload)

@@ -2,7 +2,7 @@
   <v-app>
     <v-app-bar app>
       <v-toolbar-title class="headline text-uppercase">
-        <span>Uploading Files</span>
+        <span>Converting MSDocs Files To PDF</span>
       </v-toolbar-title>
       <v-spacer></v-spacer>
       <span class="font-weight-light">Honeywell HTAL</span>

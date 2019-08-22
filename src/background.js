@@ -1,5 +1,4 @@
 'use strict'
-
 import {
   app,
   protocol,
@@ -15,9 +14,19 @@ import {
 
 import Datastore from 'nedb'
 import axios from 'axios'
-import fs from 'fs'
+import fs, { createReadStream } from 'fs'
+
+import * as rimraf from 'rimraf'
 import path from 'path'
-import { getFilePaths, getFileProps } from './utilfns'
+import { promisify } from 'util'
+import {
+  getFilePaths,
+  getFileProps,
+  getLastUpdatedFolder,
+  getMSDocsPaths
+} from './utilfns'
+
+import { getBuffer, writeData } from './convert'
 import { menu } from './menu'
 const isDevelopment = process.env.NODE_ENV !== 'production'
 
@@ -111,8 +120,6 @@ if (isDevelopment) {
 }
 
 ipc.on('new-folder', (e, file) => {
-  const paths = getFilePaths(file.path)
-  const files = paths.map(v => getFileProps(v))
   db.update(
     { id: 'lastFolder' },
     { $set: { id: 'lastFolder', folder: file.path, type: 'info' } },
@@ -123,43 +130,31 @@ ipc.on('new-folder', (e, file) => {
       if (err) {
         showError(err)
       } else {
-        db.findOne({ folder: file.path, type: 'data' }).exec((err, docs) => {
-          if (!err) {
-            if (!docs) {
-              db.insert({ folder: file.path, files, type: 'data' }, err => {
-                if (!err) {
-                  e.sender.send('folder-saved')
-                }
-              })
-            } else {
-              e.sender.send('got-folder', docs)
-            }
-          } else {
-            showError(err)
-          }
-        })
+        e.sender.send('folder-saved')
       }
     }
   )
 })
 
 ipc.on('get-last-folder', e => {
-  db.findOne({ id: 'lastFolder' }).exec((err, lastFolder) => {
+  db.findOne({ id: 'lastFolder' }).exec((err, docs) => {
     if (!err) {
-      if (lastFolder) {
-        db.findOne({ folder: lastFolder.folder, type: 'data' }).exec(
-          (error, docs) => {
-            if (!error) {
-              e.sender.send('got-folder', docs)
-            } else {
-              showError(error)
-            }
-          }
-        )
+      const { folder = null } = docs || { folder: null }
+      if (folder) {
+        let data
+        const lastUpdated = getLastUpdatedFolder(folder)
+        if (lastUpdated) {
+          const msFiles = getMSDocsPaths(lastUpdated)
+          const files = msFiles.map(v => ({ ...v, ...getFileProps(v.path) }))
+          data = { folder: folder, files }
+        } else {
+          data = { folder: folder, files: [] }
+        }
+
+        e.sender.send('got-folder', data)
       } else {
         e.sender.send('got-folder', {})
       }
-      //e.sender.send('got-folder', docs)
     } else {
       showError(err)
     }
@@ -212,6 +207,49 @@ const showError = err => {
     message: err
   })
 }
+
+const showMsg = msg => {
+  dialog.showMessageBox(win, {
+    title: 'Message',
+    type: 'info',
+    buttons: [],
+    message: msg
+  })
+}
+ipc.on('start-converting', async (e, { baseFolder, files }) => {
+  const [_, ...rest] = baseFolder.split('\\').reverse()
+  const upOne = baseFolder === './' ? baseFolder : rest.reverse().join('\\')
+  const source = `${upOne}/SOURCE`
+  const natives = `${source}/NATIVE`
+  const pdf = `${source}/PDF`
+  const exist = async file =>
+    promisify(fs.stat)(file)
+      .then(() => true)
+      .catch(() => false)
+  const mkdir = promisify(fs.mkdir)
+  const rmdir = promisify(rimraf)
+  const cp = promisify(fs.copyFile)
+
+  try {
+    const sourceExist = await exist(source)
+    if (sourceExist) {
+      await rmdir(source)
+    }
+    await mkdir(source)
+    await mkdir(natives)
+    await mkdir(pdf)
+    await Promise.all(
+      files.map(
+        async file => await cp(file.filePath, natives + '/' + file.name)
+      )
+    )
+    showMsg(`Your recent MS files have been copied to ${natives}.`)
+    e.sender.send('done-converting')
+  } catch (error) {
+    e.sender.send('done-converting')
+    showError('Internal Error')
+  }
+})
 
 /*
 git fetch origin

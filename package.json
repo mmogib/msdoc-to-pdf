@@ -1,12 +1,12 @@
 {
-  "name": "upload-tracker",
-  "version": "0.1.7-alpha",
+  "name": "msdoc-to-pdf",
+  "version": "0.0.1-alpha",
   "private": true,
-  "description": "This is an application that uploads files to a sharepoint server.",
+  "description": "This is an application that converts MS files to pdf.",
   "author": "Omar Alshaharni",
   "repository": {
     "type": "git",
-    "url": "https://github.com/mmogib/upload-tracker.git"
+    "url": "https://github.com/mmogib/msdoc-to-pdf.git"
   },
   "scripts": {
     "serve": "vue-cli-service serve",
@@ -16,11 +16,14 @@
     "postinstall": "electron-builder install-app-deps",
     "postuninstall": "electron-builder install-app-deps"
   },
-  "main": "background.js",
+  "main": "background",
   "dependencies": {
     "axios": "^0.19.0",
     "core-js": "^2.6.5",
+    "form-data": "^2.5.0",
     "nedb": "^1.8.0",
+    "request": "^2.88.0",
+    "rimraf": "^3.0.0",
     "vue": "^2.6.10",
     "vuetify": "^2.0.0",
     "vuex": "^3.0.1"
